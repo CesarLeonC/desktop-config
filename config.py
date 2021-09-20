@@ -1,4 +1,30 @@
-import os, json, re, subprocess
+# Copyright (c) 2010 Aldo Cortesi
+# Copyright (c) 2010, 2014 dequis
+# Copyright (c) 2012 Randall Ma
+# Copyright (c) 2012-2014 Tycho Andersen
+# Copyright (c) 2012 Craig Barnes
+# Copyright (c) 2013 horsik
+# Copyright (c) 2013 Tao Sauvage
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import inspect, os, subprocess, re
 from libqtile.backend import base
 from libqtile import bar, layout
 from libqtile import extension, hook, widget
@@ -8,16 +34,19 @@ from libqtile.lazy import lazy
 CONFIG_DIR = "~/.config/qtile"
 START = "start.sh"
 RESTART = "restart.sh"
-my_fontfamily = {
-    "icons": "NotoSansMono Nerd Font",
-    "letters": "SauceCodePro Nerd Font"
-            }
-my_fontsize = {
-    "icons": 17,
-    "letters": 15
-            }
+SHUTDOWN = "shutdown.sh"
 
 my_window_margin = 15
+font_kwargs = {
+    "letters": {
+        "font": "SauceCodePro Nerd Font",
+        "fontsize": 13
+            },
+    "icons": {
+        "font": "NotoSansMono Nerd Font",
+        "fontsize": 22
+            },
+        }
 
 my_terminal = "alacritty"
 my_ide = "emacsclient -c -a 'emacs'"
@@ -29,7 +58,7 @@ class_names = {
     0 : ["Pavucontrol"],
     1 : ["Alacritty"],
     2 : ["Emacs"],
-    3 : ["Libre Office"],
+    3 : ["libreoffice-startcenter"],
     4 : ["VirtualBox Manager"],
     5 : ["vlc"],
     6 : ["Nitrogen"],
@@ -37,7 +66,6 @@ class_names = {
     8 : ["obs"]
             }
 
-my_baropacity= 0.70
 my_colors = {
     "focus": "#46d9ff",
     "unfocus": "#ffffff",
@@ -45,7 +73,10 @@ my_colors = {
     "foreground": "#002282"
             }
 
-mod = "mod4"
+winkey = "mod4"
+alt = "mod1"
+shift = "shift"
+control = "control"
 
 my_workspaces = [
     ("welcome",""),
@@ -59,7 +90,7 @@ my_workspaces = [
     ("obs","辶"),
             ]
 
-for file in [START, RESTART]:
+for file in [START, RESTART, SHUTDOWN]:
     os.chmod(
         path=os.path.expanduser(CONFIG_DIR + "/" + file),
         mode=0o755
@@ -71,7 +102,7 @@ def qtile_startup():
     executable = os.path.expanduser(executable)
     subprocess.call([executable])
 
-@hook.subscribe.startup
+@hook.subscribe.restart
 def qtile_restarts():
     executable = CONFIG_DIR + "/" + RESTART
     executable = os.path.expanduser(executable)
@@ -79,35 +110,36 @@ def qtile_restarts():
 
 def window_keys():
     keys = [
-        Key([mod],"Return",lazy.layout.swap_main()),
-        Key([mod],"space",lazy.next_layout()),
-        Key([mod],"Tab",lazy.window.toggle_floating()),
-        Key([mod],"Left",lazy.screen.prev_group()),
-        Key([mod],"Right",lazy.screen.next_group()),
+        Key([winkey],"space",lazy.next_layout()),
+        Key([winkey],"Left",lazy.screen.prev_group()),
+        Key([winkey],"Right",lazy.screen.next_group()),
+        Key([winkey],"Home",lazy.next_screen()),
+        Key([winkey],"End",lazy.prev_screen()),
+        Key([winkey],"Tab",lazy.layout.next()),
+        Key([winkey],"Return",lazy.layout.swap_main())
             ]
     return keys
 
 def mgmt_keys():
     keys = [
-        Key([mod,"shift"],"c",lazy.window.kill()),
-        Key([mod],"r",lazy.restart()),
-        Key([mod],"q",lazy.shutdown()),
-        Key([mod],"d",lazy.run_extension(
+        Key([winkey,"shift"],"c",lazy.window.kill()),
+        Key([winkey],"r",lazy.restart()),
+        Key([winkey],"q",lazy.shutdown()),
+        Key([winkey],"d",lazy.run_extension(
             extension.DmenuRun(
                 dmenu_prompt="Run:",
-                font=my_fontfamily["letters"],
-                fontsize=my_fontsize["letters"]
+                **font_kwargs["letters"]
             ))),
             ]
     return keys
 
 def apps_keys():
     keys =[
-        Key([mod],"b",lazy.spawn(my_browser)),
-        Key([mod],"e",lazy.spawn(my_ide)),
-        Key([mod],"t",lazy.spawn(my_terminal)),
-        Key([mod],"v",lazy.spawn(my_vmanager)),
-        Key([mod],"o",lazy.spawn(my_recorder)),
+        Key([winkey],"b",lazy.spawn(my_browser)),
+        Key([winkey],"e",lazy.spawn(my_ide)),
+        Key([winkey],"t",lazy.spawn(my_terminal)),
+        Key([winkey],"v",lazy.spawn(my_vmanager)),
+        Key([winkey],"o",lazy.spawn(my_recorder)),
             ]
     return keys
 
@@ -115,91 +147,26 @@ def workspace_keys(groups):
     keys = list()
     keys.extend([
         Key(
-            [mod],str(i+1),
+            [winkey],str(i+1),
             lazy.group[ws.name].toscreen()
         ) for i,ws in enumerate(groups)
             ])
     keys.extend([
         Key(
-            [mod,"shift"],str(i+1),
+            [winkey,"shift"],str(i+1),
             lazy.window.togroup(ws.name,switch_group=True)
         ) for i,ws in enumerate(groups)
     ])
     return keys
-
-def init_calendar():
-    return widget.Clock(
-        format = " %a %d-%b-%Y"
-            )
-
-def init_clock():
-    return widget.Clock(
-        format = " %H:%M"
-            )
-
-def init_currentlayout():
-     return widget.CurrentLayoutIcon(
-         font = my_fontfamily["icons"],
-         fontsize = my_fontsize["icons"],
-         scale = 0.75
-            )
-
-def init_delimiter():
-    return widget.TextBox(
-        text = "|",
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+7,
-        foreground = "#FFFFFF"
-            )
-
-def init_groupbox():
-    return widget.GroupBox(
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+5,
-        highlight_method = "line",
-        active = my_colors["focus"],
-        inactive = my_colors["unfocus"]
-            )
-
-def init_logo():
-    return widget.TextBox(
-        text = "",
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+5,
-        foreground = my_colors["focus"]
-            )
 
 def init_misc():
     return widget.WidgetBox(
         widgets=[
             widget.Net(),
             widget.Battery(),
-            widget.Volume()
+            widget.Volume(),
+            widget.Systray(icon_size = font_kwargs["icons"]["fontsize"])
             ])
-
-def init_systray():
-    return widget.Systray(
-        icon_size = my_fontsize["icons"]
-            )
-
-def init_bar():
-    new_bar = bar.Bar(
-        widgets=[
-            init_logo(),
-            init_delimiter(),
-            init_groupbox(),
-            widget.Spacer(),
-            init_currentlayout(),
-            init_delimiter(),
-            init_calendar(),
-            init_delimiter(),
-            init_clock()
-            ],
-        size=28,
-        background = "#00000000",
-        opacity = my_baropacity
-            )
-    return new_bar
 
 keys = list()
 for set in [apps_keys(),mgmt_keys(),window_keys()]:
@@ -231,28 +198,63 @@ layout_kwargs = {
 
 layouts = [l(**layout_kwargs) for l in layout_types]
 
-widget_defaults = dict(
-    font=my_fontfamily["letters"],
-    fontsize=my_fontsize["letters"],
-    padding=3,
-)
+widget_list = [
+    (widget.TextBox, {"text": "","foreground":my_colors["focus"]}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.GroupBox, {"active":my_colors["focus"],"inactive": my_colors["unfocus"], "highlight_method":"line"}, font_kwargs["icons"]),
+    (widget.Spacer, {}, {}),
+    (widget.KeyboardLayout, {"configured_keyboards":['us','latam']}, font_kwargs["letters"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.CurrentLayoutIcon, {"scale": 0.75}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": ""}, font_kwargs["icons"]),
+    (widget.Clock, {"format": "%a %d-%b-%Y"}, font_kwargs["letters"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": ""}, font_kwargs["icons"]),
+    (widget.Clock, {"format": "%H:%M"}, font_kwargs["letters"]),
+            ]
 
-extension_defaults = widget_defaults.copy()
+widget_set = [
+    [w_object(**w_only,**w_general) for w_object, w_only, w_general in widget_list[:4]],
+    [w_object(**w_only,**w_general) for w_object, w_only, w_general in widget_list[4:]],
+    [init_misc()]
+            ]
 
-primary_bar = init_bar()
-secondary_bar = init_bar()
+widget_kwargs = {"padding": 3}
+widget_kwargs.update(font_kwargs["letters"])
 
-screens = [
-    Screen(top=secondary_bar),
-    Screen(top=primary_bar)
-]
+extension_defaults = widget_kwargs.copy()
+
+n_monitors = os.popen("xrandr --listmonitors").read()
+n_monitors = int(re.split(" ",re.search("Monitors.+",n_monitors)[0])[1])
+
+def init_bar(my_widgets):
+    return bar.Bar(
+        widgets = my_widgets,
+        size = 28,
+        background = "#00000000"
+    )
+
+screen_widgets = [
+    widget_set[0] + widget_set[monitor+1]
+    for monitor in range(n_monitors)
+            ]
+if n_monitors == 1:
+    screen_widgets = [
+        widget_set[0]
+        + widget_set[1]
+        + widget_set[2]
+            ]
+
+screen_bars = [init_bar(w_set) for w_set in screen_widgets]
+screens = [Screen(top=bar) for bar in screen_bars]
 
 mouse = [
-    Drag([mod], "Button1", lazy.window.set_position_floating(),
+    Drag([winkey], "Button1", lazy.window.set_position_floating(),
          start=lazy.window.get_position()),
-    Drag([mod], "Button3", lazy.window.set_size_floating(),
+    Drag([winkey], "Button3", lazy.window.set_size_floating(),
          start=lazy.window.get_size()),
-    Click([mod], "Button2", lazy.window.bring_to_front())
+    Click([winkey], "Button2", lazy.window.bring_to_front())
 ]
 
 dgroups_key_binder = None
@@ -271,20 +273,27 @@ floating_layout = layout.Floating(float_rules=[
     Match(title='branchdialog'),  # gitk
     Match(title='pinentry'),  # GPG key password entry
 ])
+
 auto_fullscreen = True
 focus_on_window_activation = "smart"
 reconfigure_screens = True
 
-# If things like steam games want to auto-minimize themselves when losing
-# focus, should we respect this or not?
+# If things like steam games want to auto-minimize
+# themselves when losing focus
+# should we respect this or not?
 auto_minimize = True
 
-# XXX: Gasp! We're lying here. In fact, nobody really uses or cares about this
-# string besides java UI toolkits; you can see several discussions on the
-# mailing lists, GitHub issues, and other WM documentation that suggest setting
-# this string if your java app doesn't work correctly. We may as well just lie
-# and say that we're a working one by default.
-#
-# We choose LG3D to maximize irony: it is a 3D non-reparenting WM written in
-# java that happens to be on java's whitelist.
+# XXX: Gasp! We're lying here. In fact, nobody really uses
+# or cares about this string besides java UI toolkits;
+# you can see several discussions on the mailing lists
+# GitHub issues, and other WM documentation that
+# suggest setting this string if your java app
+# doesn't work correctly.
+
+# We may as well just lie and say that
+# we're a working one by default.
+
+# We choose LG3D to maximize irony:
+#  - It is a 3D non-reparenting WM written in java
+#    that happens to be on java's whitelist.
 wmname = "LG3D"

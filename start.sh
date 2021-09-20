@@ -2,6 +2,8 @@
 emacs --daemon &
 emacsclient -c -a 'emacs' &
 brave &
-picom --config $HOME/.config/picom/picom.conf &
 nitrogen --restore &
-nm-applet &
+picom --config $HOME/.config/picom/picom.conf &
+if [ -x /usr/bin/nm-applet ]; then
+    nm-applet &
+fi

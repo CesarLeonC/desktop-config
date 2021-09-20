@@ -1,438 +1,94 @@
-#+TITLE: Qtile config
+#+TITLE: QTILE DESKTOP CONFIG
 #+AUTHOR: Cesar Leon
 #+EMAIL: leoncesaralejandro@gmail.com
-#+DESCRIPTION: Complete Qtile configuration file for use
-#+PROPERTY: header-args :tangle config.py
+#+DESCRIPTION: Qtile desktop environment
+#+DATE: <2021-09-08 Wed>
 
 * Table of Contents :toc:
-- [[#introduction][Introduction]]
-- [[#disclaimer][Disclaimer]]
-- [[#startup-script][Startup script]]
-  - [[#only-at-startup][Only at Startup]]
-  - [[#start-and-restarts][Start and Restarts]]
-- [[#configuration][Configuration]]
-  - [[#imports][Imports]]
-  - [[#variables][Variables]]
-  - [[#functions][Functions]]
-  - [[#keys][Keys]]
-  - [[#workspaces][Workspaces]]
-  - [[#layouts][Layouts]]
-  - [[#widgets][Widgets]]
-  - [[#screens][Screens]]
-  - [[#mouse-bindings][Mouse bindings]]
-
-* Introduction
-This document was created with the goal to provide a more concise framework of configuration of the Qtile Window Manager. The file itself is separated in categories, description and blocks of code to provide a comprehensive understanding of the variables, methods and hooks displayed on this file.
-
-* Disclaimer
-This file is entirely developed for use only and shouldn't be customized without proper knowledge of Python or Qtile Window Manager. Any modification to the present document is considered responsibiblity of the user and any ERROR, WARNING or MALFUNCTIONING of the WM is entirely up to the user
-
-It is recommended to first consult Python documentation, Modules documentation or wikis and Qtile docs, test these changes into a Virtual Machine to ensure usability. PLEASE BE CAREFUL!!! 😐😐
-
-* Startup script
-The next script is used along qitle start or restart, depending on which event is declared. Contains a set of commands needed to configure the desktop environment. This config is optional, because the use of the following features may not be installed in the OS:
-
- - picom
- -
- -
- -
- -
-
-** Only at Startup
-
-#+begin_src shell :tangle start.sh :file-mode
-#!/bin/sh
-emacs --daemon &
-emacsclient -c -a 'emacs' &
-brave &
-picom --config $HOME/.config/picom/picom.conf &
-nitrogen --restore &
-nm-applet &
-#+end_src
-
-** Start and Restarts
-
-#+begin_src shell :tangle restart.sh
-#!/bin/sh
-#+end_src
-
-* Configuration
-** Imports
-#+begin_src python
-import os, json, re, subprocess
-from libqtile.backend import base
-from libqtile import bar, layout
-from libqtile import extension, hook, widget
-from libqtile.config import Click, Drag, Group, Key, Match, Screen
-from libqtile.lazy import lazy
-#+end_src
-** Variables
-*** General
-
-#+begin_src python
-CONFIG_DIR = "~/.config/qtile"
-START = "start.sh"
-RESTART = "restart.sh"
-my_fontfamily = {
-    "icons": "NotoSansMono Nerd Font",
-    "letters": "SauceCodePro Nerd Font"
-            }
-my_fontsize = {
-    "icons": 17,
-    "letters": 15
-            }
-
-my_window_margin = 15
-#+end_src
-
-*** Applications
-
-#+begin_src python
-my_terminal = "alacritty"
-my_ide = "emacsclient -c -a 'emacs'"
-my_browser = "brave"
-my_recorder = "obs"
-my_vmanager = "VirtualBox"
-
-class_names = {
-    0 : ["Pavucontrol"],
-    1 : ["Alacritty"],
-    2 : ["Emacs"],
-    3 : ["Libre Office"],
-    4 : ["VirtualBox Manager"],
-    5 : ["vlc"],
-    6 : ["Nitrogen"],
-    7 : ["Brave-browser"],
-    8 : ["obs"]
-            }
-
-#+end_src
-
-*** Bar features
-#+begin_src python
-my_baropacity= 0.70
-my_colors = {
-    "focus": "#46d9ff",
-    "unfocus": "#ffffff",
-    "background": "#000e35",
-    "foreground": "#002282"
-            }
-#+end_src
-
-*** Custom Keys
-
-#+begin_src python
-mod = "mod4"
-#+end_src
-
-*** Workspaces
-
-#+begin_src python
-my_workspaces = [
-    ("welcome",""),
-    ("term",""),
-    ("ide",""),
-    ("doc",""),
-    ("vbox",""),
-    ("video","嗢"),
-    ("nitr",""),
-    ("web",""),
-    ("obs","辶"),
-            ]
-#+end_src
-
-** Functions
-*** StartUp
-Before running the hooks, it is advisable to change file permissions to the autostart files, as they have only read and write permissions.
-
-#+begin_src python
-for file in [START, RESTART]:
-    os.chmod(
-        path=os.path.expanduser(CONFIG_DIR + "/" + file),
-        mode=0o755
-            )
-#+end_src
-
-Once the files have been given the correct execute permissions, they can be called in the start hooks.
-
-For optimal resource management, the two startup hooks are used. The startup_once is given the apps or daemons running once logged into. A proper example is the Emacs daemon, which results in a faster Emacs startup.
-
-#+begin_src python
-@hook.subscribe.startup_once
-def qtile_startup():
-    executable = CONFIG_DIR + "/" + START
-    executable = os.path.expanduser(executable)
-    subprocess.call([executable])
-#+end_src
-
-On the other hand, if there are multiple restarts caused by constant Qtile config modifications, these apps should go to the startup hook, which includes the lazy.restart() method. Picom's configuration file is a good example, because the config is loaded on each start and restart of the WM.
-
-#+begin_src python
-@hook.subscribe.startup
-def qtile_restarts():
-    executable = CONFIG_DIR + "/" + RESTART
-    executable = os.path.expanduser(executable)
-    subprocess.call([executable])
-#+end_src
-
-*** Keybindings
-**** Window Related Keys
-
-#+begin_src python
-def window_keys():
-    keys = [
-        Key([mod],"Return",lazy.layout.swap_main()),
-        Key([mod],"space",lazy.next_layout()),
-        Key([mod],"Tab",lazy.window.toggle_floating()),
-        Key([mod],"Left",lazy.screen.prev_group()),
-        Key([mod],"Right",lazy.screen.next_group()),
-            ]
-    return keys
-#+end_src
-
-**** Common management keys
-
-#+begin_src python
-def mgmt_keys():
-    keys = [
-        Key([mod,"shift"],"c",lazy.window.kill()),
-        Key([mod],"r",lazy.restart()),
-        Key([mod],"q",lazy.shutdown()),
-        Key([mod],"d",lazy.run_extension(
-            extension.DmenuRun(
-                dmenu_prompt="Run:",
-                font=my_fontfamily["letters"],
-                fontsize=my_fontsize["letters"]
-            ))),
-            ]
-    return keys
-#+end_src
-
-**** Application keys
-
-#+begin_src python
-def apps_keys():
-    keys =[
-        Key([mod],"b",lazy.spawn(my_browser)),
-        Key([mod],"e",lazy.spawn(my_ide)),
-        Key([mod],"t",lazy.spawn(my_terminal)),
-        Key([mod],"v",lazy.spawn(my_vmanager)),
-        Key([mod],"o",lazy.spawn(my_recorder)),
-            ]
-    return keys
-#+end_src
-
-**** Workspace keys
-
-#+begin_src python
-def workspace_keys(groups):
-    keys = list()
-    keys.extend([
-        Key(
-            [mod],str(i+1),
-            lazy.group[ws.name].toscreen()
-        ) for i,ws in enumerate(groups)
-            ])
-    keys.extend([
-        Key(
-            [mod,"shift"],str(i+1),
-            lazy.window.togroup(ws.name,switch_group=True)
-        ) for i,ws in enumerate(groups)
-    ])
-    return keys
-#+end_src
-
-*** Bar
-**** Bar widgets
-
-#+begin_src python
-def init_calendar():
-    return widget.Clock(
-        format = " %a %d-%b-%Y"
-            )
-
-def init_clock():
-    return widget.Clock(
-        format = " %H:%M"
-            )
-
-def init_currentlayout():
-     return widget.CurrentLayoutIcon(
-         font = my_fontfamily["icons"],
-         fontsize = my_fontsize["icons"],
-         scale = 0.75
-            )
-
-def init_delimiter():
-    return widget.TextBox(
-        text = "|",
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+7,
-        foreground = "#FFFFFF"
-            )
-
-def init_groupbox():
-    return widget.GroupBox(
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+5,
-        highlight_method = "line",
-        active = my_colors["focus"],
-        inactive = my_colors["unfocus"]
-            )
-
-def init_logo():
-    return widget.TextBox(
-        text = "",
-        font = my_fontfamily["icons"],
-        fontsize = my_fontsize["icons"]+5,
-        foreground = my_colors["focus"]
-            )
-
-def init_misc():
-    return widget.WidgetBox(
-        widgets=[
-            widget.Net(),
-            widget.Battery(),
-            widget.Volume()
-            ])
-
-def init_systray():
-    return widget.Systray(
-        icon_size = my_fontsize["icons"]
-            )
-
-#+end_src
-
-#+begin_src python
-def init_bar():
-    new_bar = bar.Bar(
-        widgets=[
-            init_logo(),
-            init_delimiter(),
-            init_groupbox(),
-            widget.Spacer(),
-            init_currentlayout(),
-            init_delimiter(),
-            init_calendar(),
-            init_delimiter(),
-            init_clock()
-            ],
-        size=28,
-        background = "#00000000",
-        opacity = my_baropacity
-            )
-    return new_bar
-#+end_src
-
-** Keys
-
-For readability purposes, almost the entire keyset is defined as functions in the previous item. This topic is used to compile all the configs previously ordered, mantaining the proper use of the functions.
-
-#+begin_src python
-keys = list()
-for set in [apps_keys(),mgmt_keys(),window_keys()]:
-    keys.extend(set)
-#+end_src
-
-** Workspaces
-
-#+begin_src python
-groups = [Group(name=ws,label=l) for ws,l in my_workspaces]
-ws_keys = workspace_keys(groups)
-keys.extend(ws_keys)
-
-@hook.subscribe.client_new
-def arrangement(app):
-    name = app.window.get_wm_class()[1]
-    for i,ws in enumerate(groups):
-        if name in class_names[i]:
-            group_name = ws.name
-            app.togroup(group_name,switch_group=True)
-#+end_src
-
-** Layouts
-#+begin_src python
-layout_types = [
-    layout.MonadTall,
-    layout.MonadWide,
-    layout.Matrix,
-    layout.Max
-            ]
-
-layout_kwargs = {
-    "border_focus":my_colors["focus"],
-    "margin": my_window_margin
-            }
-
-layouts = [l(**layout_kwargs) for l in layout_types]
-#+end_src
-** Widgets
-#+begin_src python
-widget_defaults = dict(
-    font=my_fontfamily["letters"],
-    fontsize=my_fontsize["letters"],
-    padding=3,
-)
-
-extension_defaults = widget_defaults.copy()
-
-#+end_src
-** Screens
-#+begin_src python
-primary_bar = init_bar()
-secondary_bar = init_bar()
-
-screens = [
-    Screen(top=secondary_bar),
-    Screen(top=primary_bar)
-]
-
-#+end_src
-** Mouse bindings
-
-#+begin_src python
-mouse = [
-    Drag([mod], "Button1", lazy.window.set_position_floating(),
-         start=lazy.window.get_position()),
-    Drag([mod], "Button3", lazy.window.set_size_floating(),
-         start=lazy.window.get_size()),
-    Click([mod], "Button2", lazy.window.bring_to_front())
-]
-
-dgroups_key_binder = None
-dgroups_app_rules = []  # type: List
-follow_mouse_focus = True
-bring_front_click = False
-cursor_warp = False
-
-#+end_src
-
-#+begin_src python
-floating_layout = layout.Floating(float_rules=[
-    # Run the utility of `xprop` to see the wm class and name of an X client.
-    ,*layout.Floating.default_float_rules,
-    Match(wm_class='confirmreset'),  # gitk
-    Match(wm_class='makebranch'),  # gitk
-    Match(wm_class='maketag'),  # gitk
-    Match(wm_class='ssh-askpass'),  # ssh-askpass
-    Match(title='branchdialog'),  # gitk
-    Match(title='pinentry'),  # GPG key password entry
-])
-auto_fullscreen = True
-focus_on_window_activation = "smart"
-reconfigure_screens = True
-
-# If things like steam games want to auto-minimize themselves when losing
-# focus, should we respect this or not?
-auto_minimize = True
-
-# XXX: Gasp! We're lying here. In fact, nobody really uses or cares about this
-# string besides java UI toolkits; you can see several discussions on the
-# mailing lists, GitHub issues, and other WM documentation that suggest setting
-# this string if your java app doesn't work correctly. We may as well just lie
-# and say that we're a working one by default.
-#
-# We choose LG3D to maximize irony: it is a 3D non-reparenting WM written in
-# java that happens to be on java's whitelist.
-wmname = "LG3D"
-#+end_src
+- [[#what-is-this][What is this?]]
+  - [[#features][Features]]
+- [[#software-used][Software used]]
+  - [[#display-server][Display Server]]
+  - [[#folder-management][Folder management]]
+  - [[#window-manager-and-stuff][Window Manager and stuff]]
+  - [[#fonts][Fonts]]
+  - [[#other-software][Other software]]
+- [[#important][Important]]
+- [[#screenshots][Screenshots]]
+
+* What is this?
+A Qtile config file with a "minimalistic" (because now everything with less clutter is minimalistic), using a proper arrangement of windows and *almost* a proper usage of python features to make the config readable to the user.
+
+** Features
+ - Top bar, instead of the default bottom bar.
+ - Icons for every widget that could be iconized.
+ - Window arrangement with the primary goal of displaying a beautiful and cool wallpaper.
+ - Default qtile config features already optimized.
+
+* Software used
+Throughout the configuration file, you will encounter with variables, arrays, dictionaries and other stuff that maybe, just maybe, it is not installed in your Distro.
+
+This config assumes that you run a vanilla Arch Linux (just the tty terminal with bash or zsh) OS. If you're using other distros like Debian, consult your package manager for packages availability.
+
+This config has not been used alongside these KDE, LXDE or GNOME; so I can't give support for multiple DE (I have a simple XMonad environment, but it didn't give me problems or crashes).
+
+Here is the list of the software currently used to run Qtile with this config. This list is arranged in order of installation (as i remember), and gives you the steps I used to reach this environment.
+
+** Display Server
+ - [[https://xorg.freedesktop.org][Xorg display server]]
+
+   I use Xorg display server as default. Haven't tested the config with others. Install all the group and all its dependencies.
+
+** Folder management
+ - [[https://www.freedesktop.org/wiki/Software/xdg-ser-dirs][xdg-user-dirs & xdg-utils]]
+
+   These packages are used to create simple directories and the .config and .local folders to store dotfiles and other configs.
+
+   You can use other software that manages your dotfiles. The default for packages like picom and qtile is to create a dotfolder in tyour home directory (~/.picom or/and $HOME/.qtile). Do as you like.
+
+   In my case, I use these folders as default storage of config files, including Qtile config and fonts (next topic).
+
+ - [[https://github.com/alacritty/alacritty][Alacritty]]
+
+   I've been using Alacritty, and it is really fast, but you can use the terminal emulator of your liking.
+
+** Window Manager and stuff
+ - [[https://www.qtile.org][Qtile]]
+
+   Obviously.
+
+ - [[https://github.com/yshui/picom][picom]]
+
+   The compositor to create fade effects, opacity and other stuff.
+
+ - [[http://projects.l3ib.org/nitrogen][nitrogen]]
+
+   Wallpaper browser (JUST THE BROWSER). You need to download your wallpapers in order to use it, as you will only find a black screen at startup and an empty white space in nitrogen.
+
+ - [[https://www.brave.com][Brave browser]]
+
+   A Chromium based browser with added functionality and less CPU/Memory consumption, not like the other Chromium based browser (the big corporation one).
+
+** Fonts
+
+This topic is important if you want to use icons and glyphs instead of words to label your groups (workspaces) or to give more flavor to simple things like the hour or the net usage.
+
+Install any NerdFont patched Font from [[https://github.com/ryanoasis/nerd-fonts/][ryanoasis/nerd-fonts]] in ~.local/share/fonts~ folder or your preferred fonts folder, run ~fc-cache -vf~ and see if it's available with ~fc-list | grep "$YOUR_FONT"~ where ~YOUR_FONT~ is the name of the downloaded patched font.
+
+Test the font with your qtile config by copying the icon from the [[https://www.nerdfonts.com/cheat-sheet][Cheat Sheet]] to, for instance, the "Bar" object, test your config.py file, solve any errors and restart qtile when everything's ok.
+
+You should see the icon instead of a white border empty rectangle. The fonts used in this config are:
+
+ - NotoSansMono Nerd Font
+ - SauceCodePro Nerd Font
+
+** Other software
+
+There are other apps/packages installed on the OS and used in the config. It is up to you to install them on the systen or removing them from the config.
+
+* Important
+Be aware to backup your file before attempting to modify the config. I've spent hours with errors just because there wasn't a comma in one of the lists, and I don't want you to suffer the same.
+
+A good measure to avoid this is to have an IDE capable of debugging, that way you can trace errors and solve them easily.
+
+* Screenshots
