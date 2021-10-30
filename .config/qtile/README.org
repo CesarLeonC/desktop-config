@@ -1,0 +1,517 @@
+#+TITLE: Qtile config
+#+AUTHOR: Cesar Leon
+#+EMAIL: leoncesaralejandro@gmail.com
+#+DESCRIPTION: Complete Qtile configuration file for use
+#+PROPERTY: header-args :tangle config.py
+
+* Table of Contents :toc:
+- [[#introduction][Introduction]]
+- [[#disclaimer][Disclaimer]]
+- [[#startup-script][Startup script]]
+  - [[#only-at-startup][Only at Startup]]
+  - [[#restarts][Restarts]]
+  - [[#shutdown][Shutdown]]
+- [[#configuration][Configuration]]
+  - [[#imports][Imports]]
+  - [[#variables][Variables]]
+  - [[#functions][Functions]]
+  - [[#keys][Keys]]
+  - [[#workspaces][Workspaces]]
+  - [[#layouts][Layouts]]
+  - [[#widgets][Widgets]]
+  - [[#screens][Screens]]
+  - [[#mouse-bindings][Mouse bindings]]
+  - [[#which-windows-should-float][Which windows should float?]]
+  - [[#miscellaneous-options][Miscellaneous options]]
+
+* Introduction
+This document was created with the goal to provide a more concise framework of configuration of the Qtile Window Manager. The file itself is separated in categories, description and blocks of code to provide a comprehensive understanding of the variables, methods and hooks displayed on this file.
+
+* Disclaimer
+This file is entirely developed for use only and shouldn't be customized without proper knowledge of Python or Qtile Window Manager. Any modification to the present document is considered responsibiblity of the user and any ERROR, WARNING or MALFUNCTIONING of the WM is entirely up to the user
+
+It is recommended to first consult Python documentation, Modules documentation or wikis and Qtile docs, test these changes into a Virtual Machine to ensure usability. PLEASE BE CAREFUL!!! 😐😐
+
+* Startup script
+The next script is used along qitle start or restart, depending on which event is declared. Contains a set of commands needed to configure the desktop environment. This config is optional, because the use of the following features may not be installed in the OS:
+
+ - alacritty
+ - brave
+ - emacs (Doom Emacs)
+ - nitrogen
+ - nm-applet
+ - picom
+
+** Only at Startup
+
+#+begin_src shell :tangle start.sh :file-mode
+#!/bin/sh
+emacs --daemon &
+emacsclient -c -a 'emacs' &
+brave &
+nitrogen --restore &
+picom --config $HOME/.config/picom/picom.conf &
+if [ -x /usr/bin/nm-applet ]; then
+    nm-applet &
+fi
+#+end_src
+
+** Restarts
+
+#+begin_src shell :tangle restart.sh
+#!/bin/sh
+killall nm-applet
+if [ -x /usr/bin/nm-applet ]; then
+    nm-applet &
+fi
+#+end_src
+
+** Shutdown
+
+#+begin_src shell :tangle shutdown.sh
+#!/bin/sh
+#+end_src
+
+
+* Configuration
+** Imports
+A very basic modules import from qtile, excepting a few ones used to obtain arguments that are key to the config file
+
+#+begin_src python
+# Copyright (c) 2010 Aldo Cortesi
+# Copyright (c) 2010, 2014 dequis
+# Copyright (c) 2012 Randall Ma
+# Copyright (c) 2012-2014 Tycho Andersen
+# Copyright (c) 2012 Craig Barnes
+# Copyright (c) 2013 horsik
+# Copyright (c) 2013 Tao Sauvage
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import inspect, os, subprocess, re
+from libqtile.backend import base
+from libqtile import bar, layout
+from libqtile import extension, hook, widget
+from libqtile.config import Click, Drag, Group, Key, Match, Screen
+from libqtile.lazy import lazy
+#+end_src
+** Variables
+*** General
+Here, variables corresponding to the startups hooks, icon and text fonts, and more are defined for general use. The ~CONFIG_DIR~ variable shouldn't be remove or modified without specifying a different folder to store the files. Fonts are installed, i presume.
+
+#+begin_src python
+CONFIG_DIR = "~/.config/qtile"
+START = "start.sh"
+RESTART = "restart.sh"
+SHUTDOWN = "shutdown.sh"
+
+my_window_margin = 15
+font_kwargs = {
+    "letters": {
+        "font": "SauceCodePro Nerd Font",
+        "fontsize": 13
+            },
+    "icons": {
+        "font": "NotoSansMono Nerd Font",
+        "fontsize": 22
+            },
+        }
+
+#+end_src
+
+*** TODO Applications
+Apps used in this config are declared here. You should note that the classnames of the windows have a different type (dictionary) because these are used for workspace arrangement of the windows.
+
+TODO: Create a list of applications and use a list type variable instead of singular variables
+
+#+begin_src python
+my_terminal = "alacritty"
+my_ide = "emacsclient -c -a 'emacs'"
+my_browser = "brave"
+my_recorder = "obs"
+my_vmanager = "VirtualBox"
+
+class_names = {
+    0 : ["Pavucontrol"],
+    1 : ["Alacritty"],
+    2 : ["Emacs"],
+    3 : ["libreoffice-startcenter"],
+    4 : ["VirtualBox Manager"],
+    5 : ["vlc"],
+    6 : ["Nitrogen"],
+    7 : ["Brave-browser"],
+    8 : ["obs"]
+            }
+
+#+end_src
+
+*** Bar features
+Features exclusively for bar using. TODO: Extend more features to the bar, as the minimun is provided.
+
+#+begin_src python
+my_colors = {
+    "focus": "#46d9ff",
+    "unfocus": "#ffffff",
+    "background": "#000e35",
+    "foreground": "#002282"
+            }
+#+end_src
+
+*** Custom Keys
+Simple mod key management, replacing the names of the keys with appropiate variable names.
+
+#+begin_src python
+winkey = "mod4"
+alt = "mod1"
+shift = "shift"
+control = "control"
+#+end_src
+
+*** Workspaces
+Each group (workspace from hereon) is a tuple of the name and the label to display in the bar. Customize by adding or removing tuples, but not changing the type of the list or the tuples.
+
+#+begin_src python
+my_workspaces = [
+    ("welcome",""),
+    ("term",""),
+    ("ide",""),
+    ("doc",""),
+    ("vbox",""),
+    ("video","嗢"),
+    ("nitr",""),
+    ("web",""),
+    ("obs","辶"),
+            ]
+#+end_src
+
+** Functions
+*** StartUp
+Before running the hooks, it is advisable to change file permissions to the autostart files, as they have only read and write permissions.
+
+#+begin_src python
+for file in [START, RESTART, SHUTDOWN]:
+    os.chmod(
+        path=os.path.expanduser(CONFIG_DIR + "/" + file),
+        mode=0o755
+            )
+#+end_src
+
+Once the files have been given the correct execute permissions, they can be called in the start hooks.
+
+For optimal resource management, the two startup hooks are used. The startup_once is given the apps or daemons running once logged into. A proper example is the Emacs daemon, which results in a faster Emacs startup.
+
+#+begin_src python
+@hook.subscribe.startup_once
+def qtile_startup():
+    executable = CONFIG_DIR + "/" + START
+    executable = os.path.expanduser(executable)
+    subprocess.call([executable])
+#+end_src
+
+On the other hand, if there are multiple restarts caused by constant Qtile config modifications, these apps should go to the startup hook, which includes the lazy.restart() method. Picom's configuration file is a good example, because the config is loaded on each start and restart of the WM.
+
+#+begin_src python
+@hook.subscribe.restart
+def qtile_restarts():
+    executable = CONFIG_DIR + "/" + RESTART
+    executable = os.path.expanduser(executable)
+    subprocess.call([executable])
+#+end_src
+
+*** Keybindings
+**** Window Related Keys
+
+#+begin_src python
+def window_keys():
+    keys = [
+        Key([winkey],"space",lazy.next_layout()),
+        Key([winkey],"Left",lazy.screen.prev_group()),
+        Key([winkey],"Right",lazy.screen.next_group()),
+        Key([winkey],"Home",lazy.next_screen()),
+        Key([winkey],"End",lazy.prev_screen()),
+        Key([winkey],"Tab",lazy.layout.next()),
+        Key([winkey],"Return",lazy.layout.swap_main())
+            ]
+    return keys
+#+end_src
+
+**** Common management keys
+
+#+begin_src python
+def mgmt_keys():
+    keys = [
+        Key([winkey,"shift"],"c",lazy.window.kill()),
+        Key([winkey],"r",lazy.restart()),
+        Key([winkey],"q",lazy.shutdown()),
+        Key([winkey],"d",lazy.run_extension(
+            extension.DmenuRun(
+                dmenu_prompt="Run:",
+                **font_kwargs["letters"]
+            ))),
+            ]
+    return keys
+#+end_src
+
+**** TODO Application keys
+
+#+begin_src python
+def apps_keys():
+    keys =[
+        Key([winkey],"b",lazy.spawn(my_browser)),
+        Key([winkey],"e",lazy.spawn(my_ide)),
+        Key([winkey],"t",lazy.spawn(my_terminal)),
+        Key([winkey],"v",lazy.spawn(my_vmanager)),
+        Key([winkey],"o",lazy.spawn(my_recorder)),
+            ]
+    return keys
+#+end_src
+
+**** Workspace keys
+
+#+begin_src python
+def workspace_keys(groups):
+    keys = list()
+    keys.extend([
+        Key(
+            [winkey],str(i+1),
+            lazy.group[ws.name].toscreen()
+        ) for i,ws in enumerate(groups)
+            ])
+    keys.extend([
+        Key(
+            [winkey,"shift"],str(i+1),
+            lazy.window.togroup(ws.name,switch_group=True)
+        ) for i,ws in enumerate(groups)
+    ])
+    return keys
+#+end_src
+
+*** Bar
+**** Bar widgets
+
+#+begin_src python
+def init_misc():
+    return widget.WidgetBox(
+        widgets=[
+            widget.Net(),
+            widget.Battery(),
+            widget.Volume(),
+            widget.Systray(icon_size = font_kwargs["icons"]["fontsize"])
+            ])
+
+#+end_src
+
+** Keys
+
+For readability purposes, almost the entire keyset are funtions defined before the section. This topic is used to compile all the configs previously ordered, mantaining the proper use of the functions.
+
+#+begin_src python
+keys = list()
+for set in [apps_keys(),mgmt_keys(),window_keys()]:
+    keys.extend(set)
+#+end_src
+
+** Workspaces
+The proper name of these are *Groups*, but for everyone that is moving from other Window Managers, the name would only provide confusion over the config. In the variables section, ~my_workspaces~ was defined as a list of tuples containing /Workspace Name/ and /Workspace Label/. Then, the ~ws_keys~, containing the related keys are provided using the ~groups~ variable.
+
+Once defined, one *best practice* behaviour present in other WMs is the focus on app initialization. In Qtile, exists a hook that manages this behaviour, which is defined by setting the name of the app opened, and if that corresponds to the list provided previously, it will open in the desired workspace/group.
+
+#+begin_src python
+groups = [Group(name=ws,label=l) for ws,l in my_workspaces]
+ws_keys = workspace_keys(groups)
+keys.extend(ws_keys)
+
+@hook.subscribe.client_new
+def arrangement(app):
+    name = app.window.get_wm_class()[1]
+    for i,ws in enumerate(groups):
+        if name in class_names[i]:
+            group_name = ws.name
+            app.togroup(group_name,switch_group=True)
+#+end_src
+
+** Layouts
+As all the layouts share the same config; the layouts are listed, the config is placed inside a dictionary and both are used in a list comprehension.
+
+#+begin_src python
+layout_types = [
+    layout.MonadTall,
+    layout.MonadWide,
+    layout.Matrix,
+    layout.Max
+            ]
+
+layout_kwargs = {
+    "border_focus":my_colors["focus"],
+    "margin": my_window_margin
+            }
+
+layouts = [l(**layout_kwargs) for l in layout_types]
+#+end_src
+
+** Widgets
+All widgets are placed inside a list, which is ordered as they would be located in the bar. Any new widget that doesn't relate with the groups configuration should be tested after the Spacer widget.
+
+The widgets are re-arranged in the ~widget_set~ variable, and then used by the next variables.
+
+#+begin_src python
+
+widget_list = [
+    (widget.TextBox, {"text": "","foreground":my_colors["focus"]}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.GroupBox, {"active":my_colors["focus"],"inactive": my_colors["unfocus"], "highlight_method":"line"}, font_kwargs["icons"]),
+    (widget.Spacer, {}, {}),
+    (widget.KeyboardLayout, {"configured_keyboards":['us','latam']}, font_kwargs["letters"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.CurrentLayoutIcon, {"scale": 0.75}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": ""}, font_kwargs["icons"]),
+    (widget.Clock, {"format": "%a %d-%b-%Y"}, font_kwargs["letters"]),
+    (widget.TextBox, {"text": "|"}, font_kwargs["icons"]),
+    (widget.TextBox, {"text": ""}, font_kwargs["icons"]),
+    (widget.Clock, {"format": "%H:%M"}, font_kwargs["letters"]),
+            ]
+
+widget_set = [
+    [w_object(**w_only,**w_general) for w_object, w_only, w_general in widget_list[:4]],
+    [w_object(**w_only,**w_general) for w_object, w_only, w_general in widget_list[4:]],
+    [init_misc()]+[w_object(**w_only,**w_general) for w_object, w_only, w_general in widget_list[5:]]
+            ]
+
+widget_kwargs = {"padding": 3}
+widget_kwargs.update(font_kwargs["letters"])
+
+extension_defaults = widget_kwargs.copy()
+
+#+end_src
+
+** DONE Screens
+*** Automatic monitor recognition
+By default, Qtile doesn't recognize the number of monitors available, and displays the first bar to the first display.
+Using this workaround, qtile launches xrandr and take the number of monitors available to use and places bars equal to the number of lists provided in the ~widget_set~ variable, which *needs* to be equal to the number of monitors.
+
+For the default one monitor setup, all lists are wrapped around the only bar displayed. *THIS MEANS THAT ALL WIDGETS WOULD BE CLUTTERED IN THE BAR, SO BE AWARE OF THIS*.
+
+#+begin_src python
+n_monitors = os.popen("xrandr --listmonitors").read()
+n_monitors = int(re.split(" ",re.search("Monitors.+",n_monitors)[0])[1])
+#+end_src
+
+*** Bar initialization function
+This function only returns the bar with custom options like full transparency (~background = "#00000000"~), 28 pixels of size and the set of widgets.
+
+#+begin_src python
+def init_bar(my_widgets):
+    return bar.Bar(
+        widgets = my_widgets,
+        size = 28,
+        background = "#00000000"
+    )
+#+end_src
+
+*** Widgets allocation
+I set the widgets inside a list, with the first set of widgets as the default (as these widgets are the ones used to navigate through groups and should be seen in all screens).
+
+#+begin_src python
+screen_widgets = [
+    widget_set[0] + widget_set[monitor+1]
+    for monitor in range(n_monitors)
+            ]
+if n_monitors == 1:
+    screen_widgets = [
+        widget_set[0]
+        + widget_set[1]
+        + widget_set[2]
+            ]
+#+end_src
+
+*** Screens configuration
+Finally, initialize the bar with the respective widgets to use in */n/* screens displayed.
+
+#+begin_src python
+screen_bars = [init_bar(w_set) for w_set in screen_widgets]
+screens = [Screen(top=bar) for bar in screen_bars]
+#+end_src
+
+And there you are, you've got your screen(s) configured
+
+** DONE Mouse bindings
+This section doesn't need any custom config, because the default provided by Qtile docs is already the most used. If you ever do need to change this behaviour, read the docs to see whats available.
+
+#+begin_src python
+mouse = [
+    Drag([winkey], "Button1", lazy.window.set_position_floating(),
+         start=lazy.window.get_position()),
+    Drag([winkey], "Button3", lazy.window.set_size_floating(),
+         start=lazy.window.get_size()),
+    Click([winkey], "Button2", lazy.window.bring_to_front())
+]
+
+dgroups_key_binder = None
+dgroups_app_rules = []  # type: List
+follow_mouse_focus = True
+bring_front_click = False
+cursor_warp = False
+
+#+end_src
+
+** Which windows should float?
+Qtile defines a variable to rule the windows that should float instead of stack to the current layout. There are few important changes that should be done in this section, but leaving them with the default should be okay.
+
+#+begin_src python
+floating_layout = layout.Floating(float_rules=[
+    # Run the utility of `xprop` to see the wm class and name of an X client.
+    ,*layout.Floating.default_float_rules,
+    Match(wm_class='confirmreset'),  # gitk
+    Match(wm_class='makebranch'),  # gitk
+    Match(wm_class='maketag'),  # gitk
+    Match(wm_class='ssh-askpass'),  # ssh-askpass
+    Match(title='branchdialog'),  # gitk
+    Match(title='pinentry'),  # GPG key password entry
+])
+#+end_src
+
+** Miscellaneous options
+This declares the fullscreen behaviour, focus behaviour and window manager name. Anything that is not related to the previous sections should be placed here, for readability.
+
+#+begin_src python
+auto_fullscreen = True
+focus_on_window_activation = "smart"
+reconfigure_screens = True
+
+# If things like steam games want to auto-minimize
+# themselves when losing focus
+# should we respect this or not?
+auto_minimize = True
+
+# XXX: Gasp! We're lying here. In fact, nobody really uses
+# or cares about this string besides java UI toolkits;
+# you can see several discussions on the mailing lists
+# GitHub issues, and other WM documentation that
+# suggest setting this string if your java app
+# doesn't work correctly.
+
+# We may as well just lie and say that
+# we're a working one by default.
+
+# We choose LG3D to maximize irony:
+#  - It is a 3D non-reparenting WM written in java
+#    that happens to be on java's whitelist.
+wmname = "LG3D"
+#+end_src
